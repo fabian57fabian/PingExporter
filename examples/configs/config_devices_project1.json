@@ -1,0 +1,20 @@
+{
+  "conf": {
+    "prom_id": "ExporterDevices_project1",
+    "interval": 55,
+    "timeout": 1,
+    "value_dev_down": 3000
+  },
+  "jobs": [
+    {
+      "job": "Device01",
+      "ip": "192.168.1.57",
+      "metrics": ["ping"]
+    },
+    {
+      "job": "Device01",
+      "ip": "192.168.1.58",
+      "metrics": ["ping"]
+    }
+  ]
+}
