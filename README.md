@@ -23,28 +23,26 @@ All targets have following template:
 ```json
 {
   "conf": {
-    /* Name of Server Exporter */
     "prom_id": "ExporterINFO_PROJECT",
-    /* Check interval, better > JOBS * 2 */
     "interval": 55,
-    /* Integer timeout, better in [1, 2] */
-    "timeout": 1,
-    /* Value to set as ping time on offline device */
+    "timeout": 3,
     "value_dev_down": 3000
   },
   "jobs": [
     {
-      /* job name */
       "job": "MyDevice01", 
-      /* device ip reachable from server */
       "ip": "192.168.1.57",
-      /* metrics list */
       "metrics": [
         "ping"
       ]
     },
-    {...},
-    {...}
+    {
+      "job": "MyDevice01", 
+      "ip": "192.168.1.57",
+      "metrics": [
+        "ping"
+      ]
+    }
   ]
 }
 ```
