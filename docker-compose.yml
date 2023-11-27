@@ -1,0 +1,13 @@
+version: '3'
+services:
+  myapp:
+    build:
+      context: .
+    network_mode: "host"
+    volumes:
+      - .:/app
+      - ./config:/app/config
+    command: ["python", "src/scraper.py",
+              "--configs", "/app/config/configs"
+              "--push-config", "/app/config/push_config.json"
+    ]
