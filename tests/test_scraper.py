@@ -1,5 +1,6 @@
 from unittest import TestCase
-from src.scraper import start_engine
+from src.ExporterLauncher import start_engine
+
 
 class Test(TestCase):
     def test_start_engine_path_no_exists(self):

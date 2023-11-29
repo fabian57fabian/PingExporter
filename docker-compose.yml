@@ -7,7 +7,7 @@ services:
     volumes:
       - .:/app
       - ./config:/app/config
-    command: ["python", "src/scraper.py",
+    command: ["python", "src/ExporterLauncher.py",
               "--configs", "/app/config/configs"
               "--push-config", "/app/config/push_config.json"
     ]

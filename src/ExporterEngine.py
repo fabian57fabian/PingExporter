@@ -1,36 +1,35 @@
-import os
 import time
 import logging
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
-from prometheus_client.exposition import basic_auth_handler
 import datetime
-import json
-import shlex
-from subprocess import Popen, PIPE, STDOUT
-import threading
 from src.prometheus_manager import ExporterAuth
 from src.config_objs.PushgatewayConfig import PushgatewayConfig
-from src.config_objs.JobsConfig import Job, JobsConfig, Conf
-from src.metrics.MetricFactory import create_metrics
-from src.metrics.CrawlerFactory import create_crawler
+from src.config_objs.JobsConfig import JobsConfig
+from src.scrapers.ScrapersFactory import create_scraper
 
 
-class Exporter:
+class ExporterEngine:
     def __init__(self, pushgateway_config: PushgatewayConfig, jobs_config: JobsConfig):
         self.push_config = pushgateway_config
         self.jobs_config = jobs_config
         self.auth = ExporterAuth(self.push_config.username_pushgateway, self.push_config.pass_pushgateway)
         for job in self.jobs_config.jobs:
             job.registry_prom = CollectorRegistry()
-            for metric in job.metrics:
-                descriptors = create_metrics(metric)
-                if len(descriptors) == 0:
-                    logging.warning("Unsupported metric {}. skipping".format(metric))
-                else:
-                    job.metrics_prom[metric] = []
-                    for m_descriptor in descriptors:
-                        m_descriptor.metric_prometheus = Gauge(m_descriptor.id, m_descriptor.description, registry=job.registry_prom)
-                        job.metrics_prom[metric].append(m_descriptor)
+            for metric in job.metrics:  # like "ping" or similar
+                scraper = create_scraper(metric)
+                if scraper is None:
+                    logging.error(f"Unable to create scraper type '{metric}'. Skipping.")
+                    continue
+                metric_descriptors = scraper.build_metrics()
+                if len(metric_descriptors) == 0:
+                    logging.warning(f"Metric {metric} does not scrape any metric. Skipping.")
+                    continue
+
+                job.metrics_prom[metric] = []
+                for m_descriptor in metric_descriptors:
+                    m_descriptor.metric_prometheus = Gauge(m_descriptor.id, m_descriptor.description, registry=job.registry_prom)
+                    job.metrics_prom[metric].append(m_descriptor)
+        # Also publish this exporter data
         self.registry_exporter = CollectorRegistry()
         self.url_push = "{}:{}".format(self.push_config.ip_pushgateway, self.push_config.port_pushgateway)
         self.gauge_export_time = Gauge("exporter_duration",
@@ -68,10 +67,11 @@ class Exporter:
             logging.debug("Collecting {} metrics".format(self.jobs_config.conf.prom_id))
             for job in self.jobs_config.jobs:
                 for metric, metrics_prom in job.metrics_prom.items():
-                    crawlr_function = create_crawler(metric)
-                    if crawlr_function is None:
-                        logging.warning("Given metric has no crawl method attached! skipping".format(metric))
-                    res = crawlr_function(host=job.ip)
+                    scraper = create_scraper(metric)
+                    if scraper is None:
+                        logging.warning(f"Given metric '{metric}' has no scrape method attached! skipping")
+                    scraper.host = job.ip
+                    res = scraper.execute_once()
                     for r, m_description in zip(res, metrics_prom):
                         m_description.metric_prometheus.set(r)
                 push_to_gateway(self.url_push , job=job.job,
