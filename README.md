@@ -1,4 +1,4 @@
-# scrape4prometheus
+# PingExporter
 
 A tool to scrape multiple devices and push to prometheus gateway.
 
