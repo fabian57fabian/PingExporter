@@ -7,6 +7,7 @@ import time
 from src.engine_exporter import Exporter
 from src.config_objs.JobsConfig import JobsConfig, Conf, Job
 from src.config_objs.PushgatewayConfig import PushgatewayConfig
+from src.utils.thread_utils import run_startables_in_parallel
 
 def read_configs(conf_pushgateway_fn:str, conf_targets_dir:str) ->(PushgatewayConfig, list):
     logging.debug("Checking configuration files")
@@ -45,17 +46,8 @@ def start_engine(push_config_path: str, configs_path: str) -> int:
     if pg_config_json is None or jobs_configrations is None:
         return 1
 
-    logging.info("Starting scraper")
-    thread_list = []
-    for jobs_config in jobs_configrations:
-        e = Exporter(pg_config_json, jobs_config)
-        th = threading.Thread(target=e.start)
-        th.start()
-        thread_list.append(th)
-        time.sleep(4) #delayed to start ping separately
-    logging.info("All exporters have started")
-    for th in thread_list:
-        th.join()
+    workers = [Exporter(pg_config_json, jobs_config) for jobs_config in jobs_configrations]
+    run_startables_in_parallel(workers, delay_between=4)
     return 0
 
 if __name__ == '__main__':
