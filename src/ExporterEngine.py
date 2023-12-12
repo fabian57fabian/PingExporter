@@ -2,10 +2,10 @@ import time
 import logging
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 import datetime
-from src.prometheus_manager import ExporterAuth
-from src.config_objs.PushgatewayConfig import PushgatewayConfig
-from src.config_objs.JobsConfig import JobsConfig
-from src.scrapers.ScrapersFactory import create_scraper
+from .prometheus_manager import ExporterAuth
+from .config_objs.PushgatewayConfig import PushgatewayConfig
+from .config_objs.JobsConfig import JobsConfig
+from .scrapers.ScrapersFactory import create_scraper
 
 
 class ExporterEngine:

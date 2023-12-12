@@ -1,6 +1,6 @@
 from typing import Optional
 
-from src.scrapers.AbstractScraper import AbstractScraper
+from .AbstractScraper import AbstractScraper
 
 from src.scrapers.PingScraper import PingScraper
 

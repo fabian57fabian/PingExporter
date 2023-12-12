@@ -2,7 +2,7 @@ import logging
 import shlex
 from subprocess import Popen, PIPE, STDOUT
 
-from AbstractScraper import AbstractScraper
+from .AbstractScraper import AbstractScraper
 from src.scrapers.Metricdescriptor import Metricdescriptor
 
 

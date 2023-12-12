@@ -2,12 +2,10 @@ import os
 import logging
 import json
 import argparse
-import threading
-import time
-from src.ExporterEngine import ExporterEngine
-from src.config_objs.JobsConfig import JobsConfig, Conf, Job
-from src.config_objs.PushgatewayConfig import PushgatewayConfig
-from src.utils.thread_utils import run_startables_in_parallel
+from .ExporterEngine import ExporterEngine
+from .config_objs.JobsConfig import JobsConfig, Conf, Job
+from .config_objs.PushgatewayConfig import PushgatewayConfig
+from .utils.thread_utils import run_startables_in_parallel
 
 
 def read_configs(conf_pushgateway_fn:str, conf_targets_dir:str) ->(PushgatewayConfig, list):
