@@ -3,8 +3,7 @@
 A tool to scrape multiple devices and push to prometheus gateway.
 
 [![Python package](https://github.com/fabian57fabian/scrape4prometheus/actions/workflows/ci.yml/badge.svg)](https://github.com/fabian57fabian/scrape4prometheus/actions/workflows/ci.yml)
-[![Coverage Status](https://coveralls.io/repos/github/fabian57fabian/scrape4prometheus/badge.svg)](https://coveralls.io/github/fabian57fabian/scrape4prometheus)
-
+[![Coverage Status](https://coveralls.io/repos/github/fabian57fabian/PingExporter/badge.svg?branch=main)](https://coveralls.io/github/fabian57fabian/PingExporter?branch=main)
 
 ## Installation
 
