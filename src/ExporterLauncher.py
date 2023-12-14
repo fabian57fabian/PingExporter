@@ -7,47 +7,78 @@ from .config_objs.JobsConfig import JobsConfig, Conf, Job
 from .config_objs.PushgatewayConfig import PushgatewayConfig
 from .utils.thread_utils import run_startables_in_parallel
 
+class ExportersLauncher:
+    def __init__(self, conf_pushgateway_fn:str, conf_targets_dir:str):
+        self.conf_pushgateway_fn=conf_pushgateway_fn
+        self.conf_targets_dir=conf_targets_dir
+        self.cfg:PushgatewayConfig = None
+        self.targets:list = []
+        self.exporters = []
 
-def read_configs(conf_pushgateway_fn:str, conf_targets_dir:str) ->(PushgatewayConfig, list):
-    logging.debug("Checking configuration files")
-    if not os.path.isfile(conf_pushgateway_fn):
-        logging.error("Pushgateay config file does not exist!")
-        return None, None
-    if not os.path.isdir(conf_targets_dir):
-        logging.error("Targets config folder does not exist!")
-        return None, None
+    def load_configs(self) -> int:
+        logging.debug("Checking configuration files")
+        if not os.path.isfile(self.conf_pushgateway_fn):
+            logging.error("Pushgateay config file does not exist!")
+            return 3
+        if not os.path.isdir(self.conf_targets_dir):
+            logging.error("Targets config folder does not exist!")
+            return 4
 
-    logging.debug("Loading config files")
-    pg_config_json = {}
-    with open(conf_pushgateway_fn, 'r') as file:
-        pg_config_json = json.load(file)
+        logging.debug("Loading config files")
+        pg_config_json = {}
+        with open(self.conf_pushgateway_fn, 'r') as file:
+            pg_config_json = json.load(file)
 
-    cfg = PushgatewayConfig(**pg_config_json)
+        try:
+            self.cfg = PushgatewayConfig(**pg_config_json)
+        except Exception as e:
+            logging.error("Error in pushgateway config file: "+str(e))
+            return 1
 
-    targets = []
-    for fn in os.listdir(conf_targets_dir):
-        with open(os.path.join(conf_targets_dir,fn), 'r') as file:
-            targ_config_json = json.load(file)
-            targ = JobsConfig(**targ_config_json)
-            targ.conf = Conf(**targ.conf)
-            targ.jobs = [Job(**t) for t in targ.jobs]
-            targets.append(targ)
+        self.targets = []
+        for fn in os.listdir(self.conf_targets_dir):
+            with open(os.path.join(self.conf_targets_dir,fn), 'r') as file:
+                targ_config_json = json.load(file)
+                try:
+                    targ = JobsConfig(**targ_config_json)
+                except Exception as e:
+                    logging.error(f"Error loading json config file {fn}: " + str(e))
+                    return 5
+                try:
+                    targ.conf = Conf(**targ.conf)
+                except Exception as e:
+                    logging.error(f"Error loading 'conf' from config {fn}: " + str(e))
+                    return 6
+                jobs_parsed = []
+                if type(targ.jobs) is not list:
+                    logging.error(f"Error loading 'jobs' from config {fn}: 'jobs' is not a list!")
+                    return 7
+                try:
+                    for t in targ.jobs:
+                        j = Job(**t)
+                        jobs_parsed.append(j)
+                    targ.jobs = jobs_parsed
+                except Exception as e:
+                    logging.error(f"Error loading following Job from config {fn}: {t}; REASON: " + str(e))
+                    return 8
+                self.targets.append(targ)
 
-    return cfg, targets
+        self.exporters = []
+        for jobs_config in self.targets:
+            try:
+                e = ExporterEngine(self.cfg, jobs_config)
+                self.exporters.append(e)
+            except Exception as e:
+                logging.error(f"Error in config file {jobs_config}: " + str(e))
+                return 2
+        return 0
 
+    def start_engine(self):
+        logging.info("****************************************")
+        logging.info("********** Starting scraper ************")
+        logging.info("****************************************")
 
-def start_engine(push_config_path: str, configs_path: str) -> int:
-    logging.info("****************************************")
-    logging.info("********** Starting scraper ************")
-    logging.info("****************************************")
-
-    pg_config_json, jobs_configrations = read_configs(push_config_path, configs_path)
-    if pg_config_json is None or jobs_configrations is None:
-        return 1
-
-    exporters = [ExporterEngine(pg_config_json, jobs_config) for jobs_config in jobs_configrations]
-    run_startables_in_parallel(exporters, delay_between=4)
-    return 0
+        run_startables_in_parallel(self.exporters, delay_between=4)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -59,4 +90,5 @@ if __name__ == '__main__':
                         datefmt='%m/%d/%Y %I:%M:%S %p',
                         level=logging.DEBUG if args.debug else logging.INFO,
                         filename="logs_scraper.txt")
-    start_engine(args.push_config, args.configs)
+    exp = ExportersLauncher(args.push_config, args.configs)
+    exp.start_engine()

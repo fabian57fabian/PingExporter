@@ -20,7 +20,7 @@ class PingScraper(AbstractScraper):
         self.host = ""
         self.count = 1
         self.timeout_sec = 2
-        self.val_dev_down = 3000
+        self.val_dev_down = float(3000)
 
     def build_metrics(self) -> list:
         return [

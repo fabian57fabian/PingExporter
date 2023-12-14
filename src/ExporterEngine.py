@@ -2,7 +2,7 @@ import time
 import logging
 from prometheus_client import CollectorRegistry, Gauge, push_to_gateway
 import datetime
-from .prometheus_manager import ExporterAuth
+from .PrometheusPusher import PrometherusPusher
 from .config_objs.PushgatewayConfig import PushgatewayConfig
 from .config_objs.JobsConfig import JobsConfig
 from .scrapers.ScrapersFactory import create_scraper
@@ -10,9 +10,11 @@ from .scrapers.ScrapersFactory import create_scraper
 
 class ExporterEngine:
     def __init__(self, pushgateway_config: PushgatewayConfig, jobs_config: JobsConfig):
+        self.started = False
+        self.requested_stop = False
         self.push_config = pushgateway_config
         self.jobs_config = jobs_config
-        self.auth = ExporterAuth(self.push_config.username_pushgateway, self.push_config.pass_pushgateway)
+        self.prom_pusher = PrometherusPusher(self.push_config)
         for job in self.jobs_config.jobs:
             job.registry_prom = CollectorRegistry()
             for metric in job.metrics:  # like "ping" or similar
@@ -31,7 +33,6 @@ class ExporterEngine:
                     job.metrics_prom[metric].append(m_descriptor)
         # Also publish this exporter data
         self.registry_exporter = CollectorRegistry()
-        self.url_push = "{}:{}".format(self.push_config.ip_pushgateway, self.push_config.port_pushgateway)
         self.gauge_export_time = Gauge("exporter_duration",
                                        "Duration of all metrics exprot",
                                        registry=self.registry_exporter)
@@ -49,7 +50,11 @@ class ExporterEngine:
         return sleep_time
 
     def start(self):
-        while True:
+        if self.started:
+            logging.warning("Trying to start even if already started.")
+            return
+        self.started = True
+        while not self.requested_stop:
             start = datetime.datetime.now()
             self.collect_once()
             dur = (datetime.datetime.now() - start).total_seconds()
@@ -57,15 +62,24 @@ class ExporterEngine:
             self.gauge_export_time.set(dur)
             self.gauge_export_jobs.set(len(self.jobs_config.jobs))
             sleep_time = self.calculate_sleep_time(dur)
-            push_to_gateway(self.url_push, job=self.jobs_config.conf.prom_id,
-                            registry=self.registry_exporter,
-                            handler=self.auth.exec_auth_handler)
+            try:
+                self.prom_pusher.push(self.jobs_config.conf.prom_id, self.registry_exporter)
+            except Exception as e:
+                logging.error("Unable to push to gateway: "+str(e))
             time.sleep(sleep_time)
+        self.requested_stop = False
+        self.started = False
+
+    def stop(self):
+        if self.started:
+            self.requested_stop = True
 
     def collect_once(self):
         try:
             logging.debug("Collecting {} metrics".format(self.jobs_config.conf.prom_id))
             for job in self.jobs_config.jobs:
+                if self.requested_stop:
+                    return
                 for metric, metrics_prom in job.metrics_prom.items():
                     scraper = create_scraper(metric)
                     if scraper is None:
@@ -74,8 +88,11 @@ class ExporterEngine:
                     res = scraper.execute_once()
                     for r, m_description in zip(res, metrics_prom):
                         m_description.metric_prometheus.set(r)
-                push_to_gateway(self.url_push , job=job.job,
-                                registry=job.registry_prom,
-                                handler=self.auth.exec_auth_handler)
+                try:
+                    if self.requested_stop:
+                        return
+                    self.prom_pusher.push(job.job, job.registry_prom)
+                except Exception as e:
+                    logging.error("Unable to push to gateway: " + str(e))
         except Exception as e:
             logging.error("Err processing metrics: " + str(e))
